@@ -1,121 +1,197 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage'
-
-interface User {
-  name: string
-  email: string
-}
+import { WeatherDisplay } from './components/WeatherDisplay'
+import { WardrobeManager } from './components/WardrobeManager'
+import { OutfitRecommender } from './components/OutfitRecommender'
+import { getWeatherByCoords } from './services/weatherService'
+import { getOutfitRecommendation } from './services/outfitService'
+import { WeatherData, ClothingItem, OutfitRecommendation } from './types/index'
 
 function App() {
-  const [count, setCount] = useState(0)
-  const [user, setUser] = useLocalStorage<User | null>('user', null)
-  const [inputName, setInputName] = useState('')
-  const [inputEmail, setInputEmail] = useState('')
+  // Weather state
+  const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
 
-  const handleSaveUser = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (inputName && inputEmail) {
-      setUser({ name: inputName, email: inputEmail })
-      setInputName('')
-      setInputEmail('')
+  // Wardrobe state
+  const [wardrobe, setWardrobe] = useLocalStorage<ClothingItem[]>('wardrobe', [
+    {
+      id: '1',
+      name: 'Light Sweater',
+      type: 'top',
+      color: '#E8E8E8',
+      season: 'spring',
+      weatherTags: ['sunny', 'clear', 'partly-cloudy', 'cloudy'],
+    },
+    {
+      id: '2',
+      name: 'Jeans',
+      type: 'bottom',
+      color: '#1E3A8A',
+      season: 'spring',
+      weatherTags: ['sunny', 'clear', 'partly-cloudy', 'cloudy'],
+    },
+    {
+      id: '3',
+      name: 'Sneakers',
+      type: 'footwear',
+      color: '#FFFFFF',
+      season: 'spring',
+      weatherTags: ['sunny', 'clear', 'partly-cloudy', 'cloudy'],
+    },
+    {
+      id: '4',
+      name: 'Rain Jacket',
+      type: 'outerwear',
+      color: '#3B82F6',
+      season: 'fall',
+      weatherTags: ['rainy', 'stormy'],
+    },
+    {
+      id: '5',
+      name: 'Waterproof Boots',
+      type: 'footwear',
+      color: '#713F12',
+      season: 'fall',
+      weatherTags: ['rainy', 'snowy'],
+    },
+  ])
+
+  // Outfit recommendation
+  const [outfit, setOutfit] = useState<OutfitRecommendation | null>(null)
+
+  // User location
+  const [location, setLocation] = useLocalStorage('location', 'Dublin, Ireland')
+  const [newLocation, setNewLocation] = useState(location)
+
+  // Fetch weather on mount and periodically
+  useEffect(() => {
+    const fetchWeather = async () => {
+      setWeatherLoading(true)
+      try {
+        // Default to Dublin for demo
+        const weatherData = await getWeatherByCoords(53.3498, -6.2603)
+        setWeather(weatherData)
+
+        // Generate outfit recommendation
+        if (wardrobe.length > 0) {
+          const recommendation = getOutfitRecommendation(
+            wardrobe,
+            weatherData.condition as any,
+            weatherData.temp
+          )
+          setOutfit(recommendation)
+        }
+      } catch (error) {
+        console.error('Failed to fetch weather:', error)
+      } finally {
+        setWeatherLoading(false)
+      }
+    }
+
+    fetchWeather()
+    const interval = setInterval(fetchWeather, 60000) // Refresh every minute
+
+    return () => clearInterval(interval)
+  }, [wardrobe])
+
+  const handleAddItem = (item: ClothingItem) => {
+    setWardrobe([...wardrobe, item])
+  }
+
+  const handleRemoveItem = (id: string) => {
+    setWardrobe(wardrobe.filter(item => item.id !== id))
+  }
+
+  const handleUpdateLocation = () => {
+    setLocation(newLocation)
+  }
+
+  const handleRefreshWeather = async () => {
+    setWeatherLoading(true)
+    try {
+      const weatherData = await getWeatherByCoords(53.3498, -6.2603)
+      setWeather(weatherData)
+
+      if (wardrobe.length > 0) {
+        const recommendation = getOutfitRecommendation(
+          wardrobe,
+          weatherData.condition as any,
+          weatherData.temp
+        )
+        setOutfit(recommendation)
+      }
+    } catch (error) {
+      console.error('Failed to fetch weather:', error)
+    } finally {
+      setWeatherLoading(false)
     }
   }
 
-  const handleClearUser = () => {
-    setUser(null)
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 p-8">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-white mb-2">Vibe Dream</h1>
-          <p className="text-xl text-purple-100">React + Tailwind + TypeScript + localStorage</p>
-        </div>
-
-        {/* Counter Demo */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Counter Demo</h2>
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => setCount(c => c - 1)}
-              className="px-6 py-2 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition"
-            >
-              -
-            </button>
-            <span className="text-5xl font-bold text-purple-600 w-20 text-center">{count}</span>
-            <button
-              onClick={() => setCount(c => c + 1)}
-              className="px-6 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition"
-            >
-              +
-            </button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Weather Display - Full Screen Hero */}
+      <div className="relative">
+        {weather ? (
+          <WeatherDisplay weather={weather} loading={weatherLoading} onRefresh={handleRefreshWeather} />
+        ) : (
+          <div className="gradient-weather h-96 md:h-screen lg:h-[600px] flex items-center justify-center">
+            <p className="text-white text-2xl font-light">Loading weather...</p>
           </div>
-          <button
-            onClick={() => setCount(0)}
-            className="mt-6 w-full px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition"
-          >
-            Reset
-          </button>
-        </div>
+        )}
+      </div>
 
-        {/* localStorage User Demo */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">User Profile (Persisted)</h2>
-
-          {/* Save Form */}
-          <form onSubmit={handleSaveUser} className="mb-6">
-            <div className="mb-4">
+      {/* Main Content - Overlaps slightly with hero */}
+      <div className="relative -mt-20 px-4 md:px-6 py-12 md:py-16">
+        <div className="max-w-7xl mx-auto">
+          {/* Location Control */}
+          <div className="mb-10 bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl p-6 md:p-8 border border-white/40 smooth-transition">
+            <h3 className="font-bold text-gray-800 mb-4 text-lg">📍 Location Settings</h3>
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
-                placeholder="Name"
-                value={inputName}
-                onChange={e => setInputName(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 mb-3"
+                value={newLocation}
+                onChange={e => setNewLocation(e.target.value)}
+                placeholder="Enter city name"
+                className="flex-1 px-4 py-3 border-2 border-white/40 rounded-xl focus:outline-none focus:border-purple-500 bg-white/50 backdrop-blur smooth-transition"
               />
-              <input
-                type="email"
-                placeholder="Email"
-                value={inputEmail}
-                onChange={e => setInputEmail(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+              <button
+                onClick={handleUpdateLocation}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg smooth-transition transform hover:scale-105 whitespace-nowrap"
+              >
+                Update
+              </button>
+            </div>
+          </div>
+
+          {/* Two Column Layout */}
+          <div className="grid md:grid-cols-2 gap-8 lg:gap-10">
+            {/* Left Column - Wardrobe Manager */}
+            <div className="animate-fade-in-up">
+              <WardrobeManager
+                items={wardrobe}
+                onAdd={handleAddItem}
+                onRemove={handleRemoveItem}
               />
             </div>
-            <button
-              type="submit"
-              className="w-full px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition"
-            >
-              Save User
-            </button>
-          </form>
 
-          {/* Display User */}
-          {user ? (
-            <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 mb-4">
-              <p className="text-gray-700"><strong>Name:</strong> {user.name}</p>
-              <p className="text-gray-700"><strong>Email:</strong> {user.email}</p>
-              <p className="text-sm text-gray-500 mt-2">✓ Saved to localStorage</p>
+            {/* Right Column - Outfit Recommendation */}
+            <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+              <OutfitRecommender outfit={outfit} loading={weatherLoading} />
             </div>
-          ) : (
-            <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-4 mb-4 text-gray-500">
-              No user data saved yet. Fill the form above to save.
+          </div>
+
+          {/* Footer Info */}
+          <div className="mt-16 text-center">
+            <div className="glass-sm p-6 md:p-8 rounded-2xl">
+              <p className="text-gray-700 font-medium mb-2">🎨 Smart Outfit Suggestions</p>
+              <p className="text-gray-600 text-sm mb-4">
+                Your wardrobe automatically updates outfit recommendations based on real-time weather conditions
+              </p>
+              <p className="text-gray-600 text-sm">
+                💾 All your data is securely saved to your device
+              </p>
             </div>
-          )}
-
-          {user && (
-            <button
-              onClick={handleClearUser}
-              className="w-full px-4 py-2 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition"
-            >
-              Clear User
-            </button>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 text-center text-white">
-          <p className="text-sm">Refresh the page - your user data persists!</p>
+          </div>
         </div>
       </div>
     </div>
