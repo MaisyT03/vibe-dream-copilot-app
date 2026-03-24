@@ -1,0 +1,1 @@
+Make a weather app that is linked up to clothing items from your wardrobe. Using apple ui from their weather app, show an outfit or clothing items which are generated to what the the weathe ris like today. If it is raining then show an outfit perfect for a rainy day. Use glass ui.
